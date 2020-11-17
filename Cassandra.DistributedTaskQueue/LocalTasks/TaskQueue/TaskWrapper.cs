@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 using JetBrains.Annotations;
 
@@ -28,12 +28,12 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.LocalTasks.TaskQueue
 
         public bool Finished => finished;
 
-        public void Run()
+        public async void RunAsync()
         {
             LocalTaskProcessingResult result;
             try
             {
-                result = handlerTask.RunTask();
+                result = await handlerTask.RunTaskAsync();
             }
             catch (Exception e)
             {

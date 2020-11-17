@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Linq;
 
@@ -86,7 +86,7 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.LocalTasks.TaskQueue
                     if (hashtable.ContainsKey(taskIndexRecord.TaskId))
                         return LocalTaskQueueingResult.TaskIsSkippedResult;
                     var taskWrapper = new TaskWrapper(taskIndexRecord.TaskId, taskQueueReason, taskIsBeingTraced, handlerTask, this, logger);
-                    var asyncTask = Task.Factory.StartNew(taskWrapper.Run);
+                    var asyncTask = Task.Factory.StartNew(taskWrapper.RunAsync);
                     taskIsSentToThreadPool = true;
                     metricsContext.Meter("TaskIsSentToThreadPool").Mark();
                     if (!taskWrapper.Finished)

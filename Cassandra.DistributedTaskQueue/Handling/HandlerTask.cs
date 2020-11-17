@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 
 using GroBuf;
 using GroBuf.DataMembersExtracters;
@@ -26,6 +27,7 @@ using SkbKontur.Cassandra.TimeBasedUuid;
 using Vostok.Logging.Abstractions;
 
 using MetricsContext = SkbKontur.Cassandra.DistributedTaskQueue.Profiling.MetricsContext;
+using Task = SkbKontur.Cassandra.DistributedTaskQueue.Cassandra.Entities.Task;
 
 namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
 {
@@ -56,7 +58,7 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
             taskShardMetricsContext = MetricsContext.For($"Shards.{taskIndexRecord.TaskIndexShardKey.TaskTopic}.{taskIndexRecord.TaskIndexShardKey.TaskState}.Tasks");
         }
 
-        public LocalTaskProcessingResult RunTask()
+        public async Task<LocalTaskProcessingResult> RunTaskAsync()
         {
             taskShardMetricsContext.Meter("Started").Mark();
             if (taskMeta == null)
@@ -75,12 +77,12 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
                 return LocalTaskProcessingResult.Undefined;
             }
             var metricsContext = MetricsContext.For(taskMeta).SubContext(nameof(HandlerTask));
-            return TryProcessTaskExclusively(metricsContext);
+            return await TryProcessTaskExclusivelyAsync(metricsContext);
         }
 
-        private LocalTaskProcessingResult TryProcessTaskExclusively([NotNull] MetricsContext metricsContext)
+        private async Task<LocalTaskProcessingResult> TryProcessTaskExclusivelyAsync([NotNull] MetricsContext metricsContext)
         {
-            metricsContext = metricsContext.SubContext(nameof(TryProcessTaskExclusively));
+            metricsContext = metricsContext.SubContext(nameof(TryProcessTaskExclusivelyAsync));
             using (metricsContext.Timer("Total").NewContext())
             {
                 IRemoteLock taskGroupRemoteLock = null;
@@ -113,7 +115,7 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
                     taskShardMetricsContext.Meter("GotTaskLock").Mark();
                     LocalTaskProcessingResult result;
                     using (remoteLock)
-                        result = ProcessTask(metricsContext);
+                        result = await ProcessTaskAsync(metricsContext);
                     sw.Stop();
                     var isLongRunningTask = sw.Elapsed > longRunningTaskDurationThreshold;
                     logger.Log(new LogEvent(
@@ -141,9 +143,9 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
             }
         }
 
-        private LocalTaskProcessingResult ProcessTask([NotNull] MetricsContext metricsContext)
+        private async Task<LocalTaskProcessingResult> ProcessTaskAsync([NotNull] MetricsContext metricsContext)
         {
-            metricsContext = metricsContext.SubContext(nameof(ProcessTask));
+            metricsContext = metricsContext.SubContext(nameof(ProcessTaskAsync));
             using (metricsContext.Timer("Total").NewContext())
             {
                 byte[] taskData;
@@ -222,7 +224,7 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
                     return LocalTaskProcessingResult.Undefined;
                 }
 
-                var processTaskResult = DoProcessTask(inProcessMeta, taskData, metricsContext);
+                var processTaskResult = await DoProcessTaskAsync(inProcessMeta, taskData, metricsContext);
                 taskShardMetricsContext.Meter("Processed").Mark();
 
                 var newMeta = processTaskResult.NewMeta;
@@ -246,9 +248,9 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
         }
 
         [NotNull]
-        private ProcessTaskResult DoProcessTask([NotNull] TaskMetaInformation inProcessMeta, [NotNull] byte[] taskData, [NotNull] MetricsContext metricsContext)
+        private async Task<ProcessTaskResult> DoProcessTaskAsync([NotNull] TaskMetaInformation inProcessMeta, [NotNull] byte[] taskData, [NotNull] MetricsContext metricsContext)
         {
-            metricsContext = metricsContext.SubContext(nameof(DoProcessTask));
+            metricsContext = metricsContext.SubContext(nameof(DoProcessTaskAsync));
             using (metricsContext.Timer("Total").NewContext())
             {
                 IRtqTaskHandler taskHandler;
@@ -273,7 +275,7 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
                     {
                         HandleResult handleResult;
                         using (metricsContext.Timer("HandleTask").NewContext())
-                            handleResult = taskHandler.HandleTask(taskProducer, serializer, task);
+                            handleResult = await taskHandler.HandleTaskAsync(taskProducer, serializer, task);
                         rtqProfiler.ProcessTaskExecutionFinished(inProcessMeta, handleResult, sw.Elapsed);
                         MetricsContext.For(inProcessMeta).Meter("TasksExecuted").Mark();
                         using (metricsContext.Timer("UpdateTaskMetaByHandleResult").NewContext())

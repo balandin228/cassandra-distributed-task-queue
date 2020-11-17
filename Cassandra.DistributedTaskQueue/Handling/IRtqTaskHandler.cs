@@ -1,8 +1,10 @@
-﻿using GroBuf;
+using System.Threading.Tasks;
+
+using GroBuf;
 
 using JetBrains.Annotations;
 
-using SkbKontur.Cassandra.DistributedTaskQueue.Cassandra.Entities;
+using Task = SkbKontur.Cassandra.DistributedTaskQueue.Cassandra.Entities.Task;
 
 namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
 {
@@ -10,6 +12,6 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
     public interface IRtqTaskHandler
     {
         [NotNull]
-        HandleResult HandleTask([NotNull] IRtqTaskProducer taskProducer, [NotNull] ISerializer serializer, [NotNull] Task task);
+        Task<HandleResult> HandleTaskAsync([NotNull] IRtqTaskProducer taskProducer, [NotNull] ISerializer serializer, [NotNull] Task task);
     }
 }

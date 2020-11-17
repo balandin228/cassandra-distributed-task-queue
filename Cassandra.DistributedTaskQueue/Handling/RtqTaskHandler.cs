@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Threading.Tasks;
 
 using GroBuf;
 
@@ -7,6 +8,8 @@ using JetBrains.Annotations;
 using SkbKontur.Cassandra.DistributedTaskQueue.Cassandra.Entities;
 using SkbKontur.Cassandra.DistributedTaskQueue.Tracing;
 
+using Task = SkbKontur.Cassandra.DistributedTaskQueue.Cassandra.Entities.Task;
+
 namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
 {
     [PublicAPI]
@@ -14,13 +17,13 @@ namespace SkbKontur.Cassandra.DistributedTaskQueue.Handling
         where T : IRtqTaskData
     {
         [NotNull]
-        public virtual HandleResult HandleTask([NotNull] IRtqTaskProducer taskProducer, [NotNull] ISerializer serializer, [NotNull] Task task)
+        public virtual async Task<HandleResult> HandleTaskAsync([NotNull] IRtqTaskProducer taskProducer, [NotNull] ISerializer serializer, [NotNull] Task task)
         {
             theTaskProducer = taskProducer;
             Context = task.Meta;
             var taskData = serializer.Deserialize<T>(task.Data);
             using (new BusinessLogicTaskTraceContext())
-                return HandleTask(taskData);
+                return await System.Threading.Tasks.Task.Run(() => HandleTask(taskData));
         }
 
         [NotNull]
